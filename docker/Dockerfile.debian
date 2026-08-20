@@ -1,0 +1,66 @@
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+#
+
+ARG BASEIMAGE
+FROM ${BASEIMAGE}
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        wget \
+        ca-certificates \
+        git \
+        build-essential \
+        dh-make \
+        fakeroot \
+        devscripts \
+        lsb-release && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN echo "deb http://ftp.debian.org/debian $(lsb_release -cs)-backports main" > /etc/apt/sources.list.d/backports.list
+
+ARG GOLANG_VERSION=0.0.0
+RUN set -eux; \
+    \
+    arch="$(uname -m)"; \
+    case "${arch##*-}" in \
+        x86_64 | amd64) ARCH='amd64' ;; \
+        ppc64el | ppc64le) ARCH='ppc64le' ;; \
+        aarch64 | arm64) ARCH='arm64' ;; \
+        *) echo "unsupported architecture" ; exit 1 ;; \
+    esac; \
+    wget -nv -O - https://golang.google.cn/dl/go${GOLANG_VERSION}.linux-${ARCH}.tar.gz \
+    | tar -C /usr/local -xz
+
+ENV GOPATH /go
+ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
+
+# packaging
+ARG PKG_NAME
+ARG PKG_VERS
+ARG PKG_REV
+
+ENV DEBFULLNAME "HCUOpt. CORPORATION"
+ENV REVISION "$PKG_VERS-$PKG_REV"
+ENV SECTION ""
+
+# output directory
+ENV DIST_DIR=/tmp/hcu-container-toolkit-$PKG_VERS
+RUN mkdir -p $DIST_DIR /dist
+
+# hcu-container-toolkit
+WORKDIR $GOPATH/src/hcu-container-toolkit
+COPY . .
+
+ARG GIT_COMMIT
+ENV GIT_COMMIT ${GIT_COMMIT}
+RUN make PREFIX=${DIST_DIR} cmds
+
+WORKDIR $DIST_DIR
+COPY packaging/debian ./debian
+
+CMD export DISTRIB="$(lsb_release -cs)" && \
+    debuild -eDISTRIB -eSECTION -eVERSION="${REVISION}" \
+    --dpkg-buildpackage-hook='sh debian/prepare' -i -us -uc -b && \
+    mv /tmp/*.deb /dist

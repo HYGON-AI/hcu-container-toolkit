@@ -1,0 +1,23 @@
+#accept-hcu-visible-devices-as-volume-mounts = false
+#accept-hcu-visible-devices-envvar-when-unprivileged = true
+disable-require = false
+#swarm-resource = "DOCKER_RESOURCE_HCU"
+
+[hcu-container-runtime]
+#debug = "/var/log/hcu-container-runtime.log"
+log-level = "info"
+mode = "auto"
+runtimes = ["docker-runc", "runc", "crun"]
+
+[hcu-container-runtime.modes]
+
+[hcu-container-runtime.modes.cdi]
+annotation-prefixes = ["cdi.k8s.io/"]
+default-kind = "hygon.com/hcu"
+spec-dirs = ["/etc/cdi", "/var/run/cdi"]
+
+[hcu-container-runtime.modes.csv]
+mount-spec-path = "/etc/hcu-container-runtime/host-files-for-container.d"
+
+[hcu-ctk]
+path = "hcu-ctk"

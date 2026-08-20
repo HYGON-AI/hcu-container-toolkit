@@ -1,0 +1,74 @@
+#
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+#
+
+ARG BASEIMAGE
+FROM ${BASEIMAGE}
+
+# centos:stream8 is EOL.
+# We switch to the vault repositories for this base image.
+# ARG BASEIMAGE
+# RUN if [ "${BASEIMAGE}" = "quay.io/centos/centos:stream8" ]; then \
+#         sed -i -e "s|mirrorlist=|#mirrorlist=|g" \
+#                -e "s|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g" \
+#                   /etc/yum.repos.d/CentOS-Stream-*; \
+#     fi
+
+RUN yum install -y \
+        ca-certificates \
+        gcc \
+        wget \
+        git \
+        make \
+        rpm-build && \
+    rm -rf /var/cache/yum/*
+
+ARG GOLANG_VERSION=0.0.0
+RUN set -eux; \
+    \
+    arch="$(uname -m)"; \
+    case "${arch##*-}" in \
+        x86_64 | amd64) ARCH='amd64' ;; \
+        ppc64el | ppc64le) ARCH='ppc64le' ;; \
+        aarch64 | arm64) ARCH='arm64' ;; \
+        *) echo "unsupported architecture"; exit 1 ;; \
+    esac; \
+    wget -nv -O - https://golang.google.cn/dl/go${GOLANG_VERSION}.linux-${ARCH}.tar.gz \
+    | tar -C /usr/local -xz
+
+ENV GOPATH /go
+ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
+
+# packaging
+ARG PKG_NAME
+ARG PKG_VERS
+ARG PKG_REV
+ENV PKG_NAME ${PKG_NAME}
+ENV PKG_VERS ${PKG_VERS}
+ENV PKG_REV ${PKG_REV}
+
+# output directory
+ENV DIST_DIR=/tmp/hcu-container-toolkit-$PKG_VERS/SOURCES
+RUN mkdir -p $DIST_DIR /dist
+
+# hcu-container-toolkit
+WORKDIR $GOPATH/src/hcu-container-toolkit
+COPY . .
+
+ARG GIT_COMMIT
+ENV GIT_COMMIT ${GIT_COMMIT}
+RUN make PREFIX=${DIST_DIR} cmds
+
+WORKDIR $DIST_DIR/..
+COPY packaging/rpm .
+
+CMD arch=$(uname -m) && \
+    rpmbuild --clean --target=$arch -bb \
+             -D "_topdir $PWD" \
+             -D "release_date $(date +'%a %b %d %Y')" \
+             -D "git_commit ${GIT_COMMIT}" \
+             -D "version ${PKG_VERS}" \
+             -D "release ${PKG_REV}" \
+             SPECS/hcu-container-toolkit.spec && \
+    mv RPMS/$arch/*.rpm /dist

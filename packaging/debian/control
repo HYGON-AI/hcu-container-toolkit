@@ -1,0 +1,11 @@
+Source: hcu-container-toolkit
+Section: @SECTION@utils
+Priority: optional
+Maintainer: HCU Opt Devops
+Standards-Version: 1.1.0
+Build-Depends: debhelper (>= 9)
+
+Package: hcu-container-toolkit
+Architecture: any
+Description: HCU Container toolkit
+ Provides tools and utilities to enable HCU support in containers.
