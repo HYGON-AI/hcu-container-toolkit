@@ -34,7 +34,7 @@ func NewCDIModifier(logger logger.Interface, cfg *config.Config, ociSpec oci.Spe
 	logger.Debugf("Creating CDI modifier for devices: %v", devices)
 	automaticDevices := filterAutomaticDevices(devices)
 	if len(automaticDevices) != len(devices) && len(automaticDevices) > 0 {
-		return nil, fmt.Errorf("requesting a CDI device with vendor 'runtime.hygon.cn' is not supported when requesting other CDI devices")
+		return nil, fmt.Errorf("requesting a CDI device with vendor 'runtime.hygon.com' is not supported when requesting other CDI devices")
 	}
 	if len(automaticDevices) > 0 {
 		automaticModifier, err := newAutomaticCDISpecModifier(logger, cfg, automaticDevices)
@@ -142,7 +142,7 @@ func filterAutomaticDevices(devices []string) []string {
 	var automatic []string
 	for _, device := range devices {
 		vendor, class, _ := parser.ParseDevice(device)
-		if vendor == "runtime.hygon.cn" && class == "hcu" {
+		if vendor == "runtime.hygon.com" && class == "hcu" {
 			automatic = append(automatic, device)
 		}
 	}
@@ -170,7 +170,7 @@ func generateAutomaticCDISpec(logger logger.Interface, cfg *config.Config, devic
 	cdilib, err := c3000cdi.New(
 		c3000cdi.WithLogger(logger),
 		c3000cdi.WithHCUCDIHookPath(cfg.HCUCTKConfig.Path),
-		c3000cdi.WithVendor("runtime.hygon.cn"),
+		c3000cdi.WithVendor("runtime.hygon.com"),
 		c3000cdi.WithClass("hcu"),
 	)
 	if err != nil {
@@ -196,7 +196,7 @@ func generateAutomaticCDISpec(logger logger.Interface, cfg *config.Config, devic
 	return spec.New(
 		spec.WithDeviceSpecs(deviceSpecs),
 		spec.WithEdits(*commonEdits.ContainerEdits),
-		spec.WithVendor("runtime.hygon.cn"),
+		spec.WithVendor("runtime.hygon.com"),
 		spec.WithClass("hcu"),
 	)
 }
