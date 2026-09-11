@@ -56,7 +56,7 @@ func newBuilder(opts ...Option) *builder {
 		s.version = cdi.CurrentVersion
 	}
 	if s.vendor == "" {
-		s.vendor = "hygon.cn"
+		s.vendor = "hygon.com"
 	}
 	if s.class == "" {
 		s.class = "hcu"

@@ -37,7 +37,7 @@ hcu-ctk cdi generate 子命令负责生成 CDI 规范文件，其可用参数如
 - `--format`：CDI 规范的格式，可配置为`json`或`yaml`，默认值为`yaml`
 - `--device-name-strategy`：指定设备名称的生成策略，可选`index`、`uuid`、`type-index`，默认值为`index,uuid`
 - `--hcu-cdi-hook-path`或`--hcu-ctk-path`：指定 hcu-cdi-hook 二进制的路径，一般情况下无需指定
-- `--vendor`或`--cdi-vendor`：自定义设备商 ID，默认值为`hygon.cn`
+- `--vendor`或`--cdi-vendor`：自定义设备商 ID，默认值为`hygon.com`
 - `--class`或`--cdi-class`：自定义设备类型，默认值为`hcu`
 
 示例用法如下：

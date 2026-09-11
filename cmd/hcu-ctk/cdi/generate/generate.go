@@ -126,7 +126,7 @@ func (m command) build() *cli.Command {
 			Name:        "vendor",
 			Aliases:     []string{"cdi-vendor"},
 			Usage:       "the vendor string to use for the generated CDI specification.",
-			Value:       "hygon.cn",
+			Value:       "hygon.com",
 			Destination: &opts.vendor,
 		},
 		&cli.StringFlag{
