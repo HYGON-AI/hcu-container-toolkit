@@ -324,3 +324,89 @@ $ hcu-ctk container -r containerd -n k8s.io
 | 0      | 0x73873C7BC4E61081| custom-cc023   |
 +--------+-------------------+----------------+
 ```
+
+## 4.7 动态 vHCU 切分管理
+
+hcu-ctk vhcu 子命令用于动态 vHCU 切分功能的环境自检与运维管理。
+
+### 4.7.1 vhcu check
+
+对宿主机执行自检，确认是否满足动态切分的前置条件，包括配置开关、root 权限、DTK 驱动版本（≥ 6.2.26）、`hy-smi virtual` 可用性及各卡容量探测。
+
+```bash
+$ hcu-ctk vhcu check
+Dynamic vHCU split enabled in config : true
+hy-smi path                         : /opt/hyhal/bin/hy-smi
+hy-smi resolved from                : well-known
+Running as root                     : true
+hy-smi virtual usable               : true
+Driver version                      : 6.3.31-V1.5.1 (minimum 6.2.26)
+Per-card vdev limit (config)        : 4
+State dir                           : /run/hcu-container-toolkit/vhcu
+Capacity probe                     : OK (1 card(s), driver-reported remaining)
+Result: OK
+```
+
+其中`hy-smi resolved from`表示 hy-smi 的解析来源：`config` 为配置项`hysmi-path`指定，`well-known`为 DTK 常见安装目录，`PATH`为环境变量查找。显示`PATH`时会输出告警，因为容器运行时由 containerd/docker 派生、PATH 与当前 shell 不同，可能解析到另一份 hy-smi；此时建议通过配置项`hysmi-path`固定路径。
+
+### 4.7.2 vhcu status
+
+展示每张物理卡的总容量、剩余容量、虚拟卡槽位占用，以及 Toolkit 当前管理的虚拟卡数量。
+
+```bash
+$ hcu-ctk vhcu status
+------------------------------------------------------------------------------------------------------------------------------------------
+DEVICE  PCI BUS ID           TOTAL CU    TOTAL (MiB)  REMAIN CU     REMAIN (MiB)  SLOTS      SOURCE
+------------------------------------------------------------------------------------------------------------------------------------------
+0       0000:81:00.0         120         65520        90            57344         1/4        driver
+------------------------------------------------------------------------------------------------------------------------------------------
+Toolkit-managed dynamic vHCUs: 1
+  device 0: 1
+```
+
+其中 SOURCE 列为`driver`时，剩余容量直接来自驱动；为`derived`时表示驱动未提供剩余量，由 Toolkit 依据总容量与已用量推算得出。
+
+### 4.7.3 vhcu list
+
+列出当前所有动态切分的归属记录，包括归属容器、状态（active、pending、releasing）、所在物理卡、虚拟卡编号及资源配置。
+
+```bash
+$ hcu-ctk vhcu list
+----------------------------------------------------------------------------------------------------------------------------------
+CONTAINER          PHASE       DEVICE    VDEV      PCI BUS ID           CORES      MEM (MiB)
+----------------------------------------------------------------------------------------------------------------------------------
+a4e19862b4e2       active      0         0         0000:81:00.0         30         8192
+----------------------------------------------------------------------------------------------------------------------------------
+```
+
+### 4.7.4 vhcu show
+
+查看指定容器的虚拟卡归属详情，输出为 JSON，包含状态、物理卡/虚拟卡编号、资源配置及最近错误信息等。
+
+```bash
+$ hcu-ctk vhcu show a4e19862b4e2a1b04a1f793f346d0411f4a0a3857578c526a25ac6c858168fd8
+{
+  "ContainerID": "a4e19862b4e2a1b04a1f793f346d0411f4a0a3857578c526a25ac6c858168fd8",
+  "Phase": "active",
+  "DeviceIndex": 0,
+  "VdevIndex": 0,
+  "PciBusID": "0000:81:00.0",
+  "Cores": 30,
+  "MemMiB": 8192,
+  ...
+}
+```
+
+### 4.7.5 vhcu gc
+
+兜底回收已停止容器的虚拟卡。容器正常退出时会自动销毁对应虚拟卡，无需手动执行；若有宿主机频繁重启等异常场景，建议通过 systemd timer 定期运行。
+
+```bash
+$ hcu-ctk vhcu gc
+No dynamic vHCU to reclaim
+```
+
+每次自动回收的结果（成功或失败原因）都记录在`/var/log/hcu-container-toolkit-vhcu.log`。若容器退出后虚拟卡未被回收，可先查看该日志：无记录表示回收钩子未被执行，有`failed`记录则按记录中的错误处理。
+
+> [!WARNING]  
+> gc 仅回收 Toolkit 有归属记录的虚拟卡。驱动中存在但无归属记录的虚拟卡（可能为管理员预切分的实例）只会输出告警，不会被销毁。
