@@ -108,12 +108,19 @@ docker run -it --gpus '"device=0,1"' <IMAGE>
 > [!TIP]  
 > 虚拟卡创建、销毁等操作可参考[开发者社区文档](https://developer.sourcefind.cn/document/9169ef18-c10d-11f0-b077-0242ac150003?id=b782480c-e235-11f0-b9e4-0242ac150003)
 
-通过 `-e` 设置 `VHCU_VISIBLE_DEVICES` 环境变量，指定一张已创建的虚拟卡，例如 `0`。当前底层每次挂载只支持一张虚拟卡，不使用多个索引列表。
+通过 `-e` 设置 `VHCU_VISIBLE_DEVICES` 环境变量，变量值可为节点单个 vHCU（例如 `0`）、多个 vHCU（例如 `0,4`）。
 
 - 挂载单个 vHCU
 
 ```bash
 docker run -it -e VHCU_VISIBLE_DEVICES=0 <IMAGE>
+```
+
+- 挂载多个 vHCU
+
+```bash
+# 不可同时挂载同一物理卡切分出来的 vHCU
+docker run -it -e VHCU_VISIBLE_DEVICES=0,4 <IMAGE>
 ```
 
 #### 3.1.2.5 使用环境变量动态切分并挂载虚拟卡
@@ -253,12 +260,12 @@ nerdctl run -it --runtime hcu-container-runtime --device hygon.com/hcu=0 <IMAGE>
 nerdctl run -it --runtime hcu-container-runtime --device hygon.com/hcu=0 --device hygon.com/hcu=1 <IMAGE>
 ```
 
-#### 3.2.2.3 使用环境变量挂载虚拟卡
+#### 3.2.2.3 使用环境变量挂载已切分虚拟卡
 
 > [!TIP]  
 > 虚拟卡创建、销毁等操作可参考[开发者社区文档](https://developer.sourcefind.cn/document/9169ef18-c10d-11f0-b077-0242ac150003?id=b782480c-e235-11f0-b9e4-0242ac150003)
 
-通过 `-e` 设置 `VHCU_VISIBLE_DEVICES` 环境变量，指定一张已创建的虚拟卡，例如 `0`。当前底层每次挂载只支持一张虚拟卡，不使用多个索引列表。
+通过 `-e` 设置 `VHCU_VISIBLE_DEVICES` 环境变量，变量值可为节点单个 vHCU（例如 `0`）、多个 vHCU（例如 `0,4`）。
 
 - 挂载单个 vHCU
 
@@ -360,12 +367,12 @@ podman run -it --device hygon.com/hcu=0 <IMAGE>
 podman run -it --device hygon.com/hcu=0 --device hygon.com/hcu=1 <IMAGE>
 ```
 
-#### 3.3.2.3 使用环境变量挂载虚拟卡
+#### 3.3.2.3 使用环境变量挂载已切分虚拟卡
 
 > [!TIP]  
 > 虚拟卡创建、销毁等操作可参考[开发者社区文档](https://developer.sourcefind.cn/document/9169ef18-c10d-11f0-b077-0242ac150003?id=b782480c-e235-11f0-b9e4-0242ac150003)
 
-通过 `-e` 设置 `VHCU_VISIBLE_DEVICES` 环境变量，指定一张已创建的虚拟卡，例如 `0`。当前底层每次挂载只支持一张虚拟卡，不使用多个索引列表。
+通过 `-e` 设置 `VHCU_VISIBLE_DEVICES` 环境变量，变量值可为节点单个 vHCU（例如 `0`）、多个 vHCU（例如 `0,4`）。
 
 - 挂载单个 vHCU
 
