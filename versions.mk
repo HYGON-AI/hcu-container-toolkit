@@ -4,7 +4,7 @@
 #
 
 LIB_NAME := hcu-container-toolkit
-LIB_VERSION := 1.3.1
+LIB_VERSION := 1.4.0
 LIB_TAG :=
 
 # The package version is the combination of the library version and tag.

@@ -37,10 +37,10 @@ bash build.sh
 
 ```bash
 # 对于Ubuntu、Debian等系统，使用dpkg安装
-dpkg -i dist/hcu-container-toolkit_1.3.1-1_amd64.deb
+dpkg -i dist/hcu-container-toolkit_1.4.0-1_amd64.deb
 
 # 对于Rocky、CentOS等系统，使用rpm安装
-rpm -i dist/hcu-container-toolkit-1.3.1-1.x86_64.rpm
+rpm -i dist/hcu-container-toolkit-1.4.0-1.x86_64.rpm
 ```
 
 安装后会自动执行以下命令。
