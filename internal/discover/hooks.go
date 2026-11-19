@@ -59,6 +59,13 @@ func CreateTrackHook(hcuCDIHookPath string, containerId string) Hook {
 	)
 }
 
+// CreateVHCUReleaseHook creates the poststop hook that releases the dynamic
+// vHCU allocated for containerId. It has the same shape as CreateTrackHook
+// so the lifecycle handling is identical.
+func CreateVHCUReleaseHook(hcuCDIHookPath string, containerId string, allocationID string) Hook {
+	return Hook{Lifecycle: cdi.PoststopHook, Path: hcuCDIHookPath, Args: []string{"hcu-ctk", "vhcu", "release", containerId, allocationID}}
+}
+
 func CreateHcuTrackHook(path string, s string, s2 string, id string) Hook {
 	return Hook{
 		Lifecycle: cdi.PoststopHook,
