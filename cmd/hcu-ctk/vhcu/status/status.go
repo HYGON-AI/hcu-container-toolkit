@@ -7,6 +7,7 @@ package status
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"hcu-container-toolkit/cmd/hcu-ctk/vhcu/common"
@@ -101,8 +102,15 @@ func performAction(c *cli.Context, logger logger.Interface) error {
 	}
 	fmt.Fprintln(c.App.Writer, strings.Repeat("-", 140))
 	fmt.Fprintf(c.App.Writer, "Toolkit-managed dynamic vHCUs: %d\n", len(states))
-	for dev, count := range owned {
-		fmt.Fprintf(c.App.Writer, "  device %d: %d\n", dev, count)
+	// Iterate devices in index order: a map range would make the output of
+	// two identical runs differ and break snapshot-style comparison.
+	devices := make([]int, 0, len(owned))
+	for dev := range owned {
+		devices = append(devices, dev)
+	}
+	sort.Ints(devices)
+	for _, dev := range devices {
+		fmt.Fprintf(c.App.Writer, "  device %d: %d\n", dev, owned[dev])
 	}
 
 	return nil
