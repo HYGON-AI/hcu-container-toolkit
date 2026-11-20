@@ -103,12 +103,12 @@ docker run -it --gpus 2 <IMAGE>
 docker run -it --gpus '"device=0,1"' <IMAGE>
 ```
 
-#### 3.1.2.4 使用环境变量挂载虚拟卡
+#### 3.1.2.4 使用环境变量挂载已切分虚拟卡
 
 > [!TIP]  
 > 虚拟卡创建、销毁等操作可参考[开发者社区文档](https://developer.sourcefind.cn/document/9169ef18-c10d-11f0-b077-0242ac150003?id=b782480c-e235-11f0-b9e4-0242ac150003)
 
-通过`-e`设置`VHCU_VISIBLE_DEVICES`环境变量，变量值可为节点单个 vHCU（例如 0）、多个 vHCU（例如 0,4）。
+通过 `-e` 设置 `VHCU_VISIBLE_DEVICES` 环境变量，变量值可为节点单个 vHCU（例如 `0`）、多个 vHCU（例如 `0,4`）。
 
 - 挂载单个 vHCU
 
@@ -119,9 +119,66 @@ docker run -it -e VHCU_VISIBLE_DEVICES=0 <IMAGE>
 - 挂载多个 vHCU
 
 ```bash
-# 不可同时挂载同一物理卡切分出来的vHCU
+# 不可同时挂载同一物理卡切分出来的 vHCU
 docker run -it -e VHCU_VISIBLE_DEVICES=0,4 <IMAGE>
 ```
+
+#### 3.1.2.5 使用环境变量动态切分并挂载虚拟卡
+
+> [!TIP]  
+> 该能力要求 root 权限、DTK 驱动版本 ≥ 6.2.26、legacy 运行时模式（默认）。可先执行 `hcu-ctk vhcu check` 自检，参见文档 4 的 4.7 章节
+
+通过`-e`设置`HCU_VHCU_MEM`（必填）和`HCU_VHCU_CORES`（可选）环境变量，由 Toolkit 在容器启动时自动完成虚拟卡的切分与挂载，容器退出后自动销毁。相关环境变量含义如下：
+
+| 变量 | 含义 | 取值 | 必填 |
+| --- | --- | --- | --- |
+| `HCU_VHCU_MEM` | 虚拟卡显存 | 正整数，单位 MiB | 是 |
+| `HCU_VHCU_CORES` | 虚拟卡算力占比 | 0–100 整数；未设置或为`0`表示只切显存、共享 CU | 否 |
+| `HCU_VHCU_DEVICE` | 指定一张物理卡 | 单个非负整数索引，例如`0`；不支持`0,1`、`all`、BDF 等写法 | 否，未设置则自动选择 |
+
+- 同时指定算力和显存
+
+```bash
+docker run -it --rm -e HCU_VHCU_CORES=30 -e HCU_VHCU_MEM=8192 <IMAGE>
+```
+
+- 只切显存（共享算力）
+
+```bash
+docker run -it --rm -e HCU_VHCU_MEM=8192 <IMAGE>
+```
+
+- 指定物理卡索引
+
+```bash
+docker run -it --rm -e HCU_VHCU_CORES=30 -e HCU_VHCU_MEM=8192 -e HCU_VHCU_DEVICE=0 <IMAGE>
+```
+
+行为说明：
+
+- **选卡**：未指定物理卡时，自动选择分配后剩余显存最少的卡；已被 HCU Tracker 标记为独占且正在使用的卡不参与分配。
+- **算力换算**：算力占比按`ceil(占比 × 该卡 CU 数 / 100)`换算为虚拟卡 CU 数。
+- **整卡请求**：占比为`100`且显存不小于该卡总容量时，直接挂载整卡，不再创建虚拟卡。
+- **互斥**：上述变量不能与`HCU_VISIBLE_DEVICES`、`NVIDIA_VISIBLE_DEVICES`、`VHCU_VISIBLE_DEVICES`、`MIG_VISIBLE_DEVICES`或 HAMi 模式的 Device Plugin 同时使用，否则容器创建失败。
+- **数量限制**：每个容器最多动态申请一张虚拟卡；每张物理卡最多 4 张虚拟卡（含管理员预切分的实例）。
+- **回收**：Docker 在容器停止时即删除运行实例，虚拟卡随之自动销毁；containerd、Podman 等运行时的回收钩子在容器**删除**时触发，容器仅退出而未删除时虚拟卡会保留（再次启动该容器会复用同一张虚拟卡），执行`--rm`或删除容器后才会回收。无法确认时可执行`hcu-ctk vhcu gc`兜底，参见文档 4 的 4.7 章节。
+
+相关配置位于`/etc/hcu-container-runtime/config.toml`，一般无需调整：
+
+```toml
+[hcu-container-runtime.vhcu]
+enabled = true                 # 关闭后拒绝新的动态切分请求
+max-vhcu-per-card = 4           # 每张物理卡的虚拟卡数量上限，取值 1–4
+```
+
+若主机安装了多套 DTK（例如`/opt/hyhal`与`/opt/rocm`并存），可通过`hysmi-path`显式指定 hy-smi 路径，避免命令行工具与容器运行时解析到不同的二进制。
+
+```bash
+hcu-ctk config --set hcu-container-runtime.vhcu.hysmi-path=/opt/hyhal/bin/hy-smi -i
+```
+
+> [!WARNING]  
+> 使用动态切分期间，不要在同一宿主机上并发执行管理员切分命令，或通过 Device Plugin 等其他方式分配同一批虚拟卡，否则可能导致分配冲突。
 
 ## 3.2 在 Containerd 容器中挂载 HCU 设备
 
@@ -203,12 +260,12 @@ nerdctl run -it --runtime hcu-container-runtime --device hygon.com/hcu=0 <IMAGE>
 nerdctl run -it --runtime hcu-container-runtime --device hygon.com/hcu=0 --device hygon.com/hcu=1 <IMAGE>
 ```
 
-#### 3.2.2.3 使用环境变量挂载虚拟卡
+#### 3.2.2.3 使用环境变量挂载已切分虚拟卡
 
 > [!TIP]  
 > 虚拟卡创建、销毁等操作可参考[开发者社区文档](https://developer.sourcefind.cn/document/9169ef18-c10d-11f0-b077-0242ac150003?id=b782480c-e235-11f0-b9e4-0242ac150003)
 
-通过`-e`设置`VHCU_VISIBLE_DEVICES`环境变量，变量值可为节点单个 vHCU（例如 0）、多个 vHCU（例如 0,4）。
+通过 `-e` 设置 `VHCU_VISIBLE_DEVICES` 环境变量，变量值可为节点单个 vHCU（例如 `0`）、多个 vHCU（例如 `0,4`）。
 
 - 挂载单个 vHCU
 
@@ -222,6 +279,17 @@ nerdctl run -it --runtime hcu-container-runtime -e VHCU_VISIBLE_DEVICES=0 <IMAGE
 # 不可同时挂载同一物理卡切分出来的 vHCU
 nerdctl run -it --runtime hcu-container-runtime -e VHCU_VISIBLE_DEVICES=0,4 <IMAGE>
 ```
+
+#### 3.2.2.4 使用环境变量动态切分并挂载虚拟卡
+
+环境变量含义、取值及行为说明参见 3.1.2.5，将示例中的 docker 命令替换为 nerdctl 即可，注意需通过`--runtime`指定 HCU Runtime。
+
+```bash
+nerdctl run -it --rm --runtime hcu-container-runtime -e HCU_VHCU_CORES=30 -e HCU_VHCU_MEM=8192 <IMAGE>
+```
+
+> [!TIP]  
+> containerd 的回收钩子在容器删除时触发，建议使用`--rm`；若容器仅退出而未删除，虚拟卡会保留，可执行`hcu-ctk vhcu gc`兜底。
 
 ## 3.3 在 Podman 容器中挂载 HCU 设备
 
@@ -299,12 +367,12 @@ podman run -it --device hygon.com/hcu=0 <IMAGE>
 podman run -it --device hygon.com/hcu=0 --device hygon.com/hcu=1 <IMAGE>
 ```
 
-#### 3.3.2.3 使用环境变量挂载虚拟卡
+#### 3.3.2.3 使用环境变量挂载已切分虚拟卡
 
 > [!TIP]  
 > 虚拟卡创建、销毁等操作可参考[开发者社区文档](https://developer.sourcefind.cn/document/9169ef18-c10d-11f0-b077-0242ac150003?id=b782480c-e235-11f0-b9e4-0242ac150003)
 
-通过`-e`设置`VHCU_VISIBLE_DEVICES`环境变量，变量值可为节点单个 vHCU（例如 0）、多个 vHCU（例如 0,4）。
+通过 `-e` 设置 `VHCU_VISIBLE_DEVICES` 环境变量，变量值可为节点单个 vHCU（例如 `0`）、多个 vHCU（例如 `0,4`）。
 
 - 挂载单个 vHCU
 
@@ -318,6 +386,17 @@ podman run -it -e VHCU_VISIBLE_DEVICES=0 <IMAGE>
 # 不可同时挂载同一物理卡切分出来的 vHCU
 podman run -it -e VHCU_VISIBLE_DEVICES=0,4 <IMAGE>
 ```
+
+#### 3.3.2.4 使用环境变量动态切分并挂载虚拟卡
+
+环境变量含义、取值及行为说明参见 3.1.2.5，将示例中的 docker 命令替换为 podman 即可。
+
+```bash
+podman run -it --rm -e HCU_VHCU_CORES=30 -e HCU_VHCU_MEM=8192 <IMAGE>
+```
+
+> [!TIP]  
+> Podman 的回收钩子在容器删除时触发，建议使用`--rm`；若容器仅退出而未删除，虚拟卡会保留，可执行`hcu-ctk vhcu gc`兜底。
 
 ## 3.4 在 HCU-Device-Plugin 中感知 HCU 设备
 

@@ -9,6 +9,16 @@ log-level = "info"
 mode = "auto"
 runtimes = ["docker-runc", "runc", "crun"]
 
+[hcu-container-runtime.vhcu]
+enabled = true
+max-vhcu-per-card = 4 # 1-4; cannot exceed the driver limit
+state-dir = "/run/hcu-container-toolkit/vhcu"
+lock-file = "/run/hcu-container-toolkit/vhcu.lock"
+lock-timeout = "30s"
+conf-dir = "/etc/vdev" # fixed driver/mount directory
+hysmi-path = "" # empty: probe /opt/hyhal, /usr/local/hyhal, /opt/rocm, then PATH
+destroy-retries = 5
+
 [hcu-container-runtime.modes]
 
 [hcu-container-runtime.modes.cdi]

@@ -14,6 +14,10 @@ type RuntimeConfig struct {
 	Runtimes []string    `toml:"runtimes"`
 	Mode     string      `toml:"mode"`
 	Modes    modesConfig `toml:"modes"`
+	// VHCU configures the dynamic vHCU split-and-mount capability.
+	// It is a cross-mode runtime capability and therefore sits directly
+	// under [hcu-container-runtime] rather than under [hcu-container-runtime.modes].
+	VHCU vhcuModeConfig `toml:"vhcu"`
 }
 
 // modesConfig defines (optional) per-mode configs
@@ -33,6 +37,29 @@ type cdiModeConfig struct {
 
 type csvModeConfig struct {
 	MountSpecPath string `toml:"mount-spec-path"`
+}
+
+// vhcuModeConfig stores the config options for the dynamic vHCU split
+// (create-and-mount) capability.
+type vhcuModeConfig struct {
+	// Enabled toggles the dynamic vHCU capability. When false, HCU_VHCU_*
+	// requests fail with an explicit error instead of being silently ignored.
+	Enabled bool `toml:"enabled"`
+	// MaxVHCUPerCard is the per-card vdev slot limit enforced by the driver
+	// (a single physical device supports at most 4 vdevs by default).
+	MaxVHCUPerCard int `toml:"max-vhcu-per-card"`
+	// StateDir stores per-container ownership records for dynamic vHCU.
+	StateDir string `toml:"state-dir"`
+	// LockFile is the global flock file serializing dynamic splits.
+	LockFile string `toml:"lock-file"`
+	// LockTimeout bounds how long we wait on the global lock.
+	LockTimeout string `toml:"lock-timeout"`
+	// ConfDir must be /etc/vdev, matching the driver and mount path.
+	ConfDir string `toml:"conf-dir"`
+	// HysmiPath overrides the hy-smi binary path; empty means auto-detect.
+	HysmiPath string `toml:"hysmi-path"`
+	// DestroyRetries is the retry count for vdev destroy operations.
+	DestroyRetries int `toml:"destroy-retries"`
 }
 
 // GetDefaultRuntimeConfig defines the default values for the config

@@ -13,6 +13,7 @@ import (
 	"hcu-container-toolkit/cmd/hcu-ctk/hook"
 	"hcu-container-toolkit/cmd/hcu-ctk/rootless"
 	"hcu-container-toolkit/cmd/hcu-ctk/runtime"
+	"hcu-container-toolkit/cmd/hcu-ctk/vhcu"
 	"hcu-container-toolkit/internal/info"
 	"os"
 
@@ -82,6 +83,7 @@ func main() {
 		container.NewCommand(logger),
 		hook.NewCommand(logger),
 		cdi.NewCommand(logger),
+		vhcu.NewCommand(logger),
 	}
 
 	// Run the CLI

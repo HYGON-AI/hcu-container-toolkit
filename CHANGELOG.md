@@ -1,5 +1,15 @@
 # HCU Container Toolkit Changelog
 
+## v1.4.0 - 2026-11-19
+
+### Added
+- 支持通过环境变量动态切分并挂载虚拟卡
+- 新增`hcu-ctk vhcu`子命令，提供动态切分环境自检（check）、容量与归属查询（status/list/show）及兜底回收（gc）等功能
+- 新增`hcu-container-runtime.vhcu`配置节，支持调整动态切分开关、每卡虚拟卡数量上限等参数
+
+### Fixed
+- 修复主机存在多套 DTK（如`/opt/hyhal`与`/opt/rocm`并存）时，容器运行时可能解析到非预期 hy-smi、导致动态切分创建失败的问题
+
 ## v1.3.1 - 2026-07-22
 
 ### Added

@@ -12,10 +12,10 @@
 
 ```bash
 # 对于 Ubuntu、Debian 等系统，使用 dpkg 安装
-dpkg -i hcu-container-toolkit_1.3.1-1_amd64.deb
+dpkg -i hcu-container-toolkit_1.4.0-1_amd64.deb
 
 # 对于 Rocky、CentOS 等系统，使用 rpm 安装
-rpm -i hcu-container-toolkit-1.3.1-1.x86_64.rpm
+rpm -i hcu-container-toolkit-1.4.0-1.x86_64.rpm
 ```
 
 安装后会自动执行以下命令。

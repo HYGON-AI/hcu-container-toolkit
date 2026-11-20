@@ -6,6 +6,7 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"hcu-container-toolkit/internal/config"
 	"hcu-container-toolkit/internal/config/image"
@@ -37,7 +38,16 @@ func newHCUContainerRuntime(logger logger.Interface, cfg *config.Config, argv []
 		return nil, fmt.Errorf("error constructing OCI specification: %v", err)
 	}
 
-	specModifier, err := newSpecModifier(logger, cfg, ociSpec, driver, argv[len(argv)-1])
+	var stateCommand []string
+	if scoped, ok := lowLevelRuntime.(interface {
+		StateCommand([]string) ([]string, error)
+	}); ok {
+		stateCommand, err = scoped.StateCommand(argv)
+		if err != nil {
+			return nil, err
+		}
+	}
+	specModifier, err := newSpecModifier(logger, cfg, ociSpec, driver, argv[len(argv)-1], stateCommand)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct OCI spec modifier: %v", err)
 	}
@@ -50,15 +60,34 @@ func newHCUContainerRuntime(logger logger.Interface, cfg *config.Config, argv []
 		specModifier,
 	)
 
+	if m, ok := specModifier.(*allocationModifier); ok && m.rollback != nil {
+		return allocationRuntime{Runtime: r, rollback: m.rollback}, nil
+	}
 	return r, nil
 }
 
 // newSpecModifier is a factory method that creates constructs an OCI spec modifer based on the provided config.
-func newSpecModifier(logger logger.Interface, cfg *config.Config, ociSpec oci.Spec, driver *root.Driver, containerId string) (oci.SpecModifier, error) {
+func newSpecModifier(logger logger.Interface, cfg *config.Config, ociSpec oci.Spec, driver *root.Driver, containerId string, runtimeCommand []string) (result oci.SpecModifier, rerr error) {
 	rawSpec, err := ociSpec.Load()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load OCI spec: %v", err)
 	}
+
+	// Dynamic vHCU split runs before the image snapshot below: it allocates
+	// (creates) the vdev and writes VHCU_VISIBLE_DEVICES=<N> (or
+	// HCU_VISIBLE_DEVICES=<idx> on a full-card short circuit) into the raw
+	// spec, so the graphics modifier picks the mounts up through the
+	// existing code path with zero changes there.
+	vhcuModifier, cleanup, err := newVHCUModifier(logger, cfg, rawSpec, containerId, runtimeCommand)
+	if err != nil {
+		return nil, fmt.Errorf("failed to allocate dynamic vHCU: %v", err)
+	}
+
+	defer func() {
+		if rerr != nil && cleanup != nil {
+			rerr = errors.Join(rerr, cleanup())
+		}
+	}()
 
 	image, err := image.NewDTKImageFromSpec(rawSpec)
 	if err != nil {
@@ -76,6 +105,11 @@ func newSpecModifier(logger logger.Interface, cfg *config.Config, ociSpec oci.Sp
 	isMount := image.LoadHyhalMethod(loadHyhalMethodEnvvar)
 
 	var modifiers modifier.List
+	// The vHCU modifier leads the chain: the env write-back must land before
+	// the graphics modifier applies the device/mount edits.
+	if vhcuModifier != nil {
+		modifiers = append(modifiers, vhcuModifier)
+	}
 	for _, modifierType := range supportedModifierTypes(mode) {
 		switch modifierType {
 		case "mode":
@@ -103,7 +137,7 @@ func newSpecModifier(logger logger.Interface, cfg *config.Config, ociSpec oci.Sp
 		}
 		modifiers = append(modifiers, copyModifier)
 	}
-	return modifiers, nil
+	return &allocationModifier{SpecModifier: modifiers, rollback: cleanup}, nil
 }
 
 func newModeModifier(logger logger.Interface, mode string, cfg *config.Config, ociSpec oci.Spec, image image.DTK) (oci.SpecModifier, error) {
@@ -128,3 +162,22 @@ func supportedModifierTypes(mode string) []string {
 }
 
 // newStable
+
+// The cleanup closure belongs to this create attempt, never to a container
+// guessed from argv after an arbitrary runtime error.
+type allocationModifier struct {
+	oci.SpecModifier
+	rollback func() error
+}
+type allocationRuntime struct {
+	oci.Runtime
+	rollback func() error
+}
+
+func (r allocationRuntime) Exec(args []string) error {
+	err := r.Runtime.Exec(args)
+	if err != nil {
+		return errors.Join(err, r.rollback())
+	}
+	return nil
+}

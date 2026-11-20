@@ -84,6 +84,16 @@ func GetDefault() (*Config, error) {
 			LogLevel:      "info",
 			Runtimes:      []string{"docker-runc", "runc", "crun"},
 			Mode:          "auto",
+			VHCU: vhcuModeConfig{
+				Enabled:        true,
+				MaxVHCUPerCard: 4,
+				StateDir:       "/run/hcu-container-toolkit/vhcu",
+				LockFile:       "/run/hcu-container-toolkit/vhcu.lock",
+				LockTimeout:    "30s",
+				ConfDir:        "/etc/vdev",
+				HysmiPath:      "",
+				DestroyRetries: 5,
+			},
 			Modes: modesConfig{
 				CSV: csvModeConfig{
 					MountSpecPath: "/etc/hcu-container-runtime/host-files-for-container.d",
